@@ -1,25 +1,131 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
+author: "PanMud"
+date: "Octorber 1, 2017"
 output: 
   html_document:
     keep_md: true
 ---
 
-
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 ## Loading and preprocessing the data
 
+```{r activity}
+suppressPackageStartupMessages(library(dplyr))
+# Unzip archive
+unzip("activity.zip")
 
+# Read base data into a data frame.
+activity <- read.csv("activity.csv")
 
+# Data Dimensions
+dim(activity)
+# Data Summary
+summary(activity)
+```
 ## What is mean total number of steps taken per day?
 
+```{r q1}
+suppressPackageStartupMessages(library(ggplot2))
+total.steps <- tapply(activity$steps, activity$date, FUN=sum, na.rm=TRUE)
+qplot(total.steps, binwidth=1000, xlab="total number of steps taken each day", ylab="Frequency",
+      fill=I("blue"), col=I("black"))
+```
+mean of the total number of steps taken per day
 
+```{r q1a}
+mean(total.steps, na.rm=TRUE)
+```
+median of the total number of steps taken per day
+
+```{r q1b}
+median(total.steps, na.rm=TRUE)
+```
 
 ## What is the average daily activity pattern?
 
+```{r q2}
+suppressPackageStartupMessages(library(ggplot2))
+averages <- aggregate(x=list(steps=activity$steps), by=list(interval=activity$interval),
+                      FUN=mean, na.rm=TRUE)
+ggplot(data=averages, aes(x=interval, y=steps)) + geom_line(color="blue")  + 
+       xlab("5-minute interval") + ylab("average number of steps taken")
+```    
+Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
 
+```{r q2a}
+averages[which.max(averages$steps),]
+```
 
 ## Imputing missing values
+total number of missing values in the dataset 
+
+```{r q3a}
+missing <- is.na(activity$steps)
+# How many missing
+table(missing)
+```
+
+Fill the missing values with mean value for that 5-minute interval.
+
+```{r q3b}
+# Replace each missing value with the mean value of its 5-minute interval
+fill.value <- function(steps, interval) {
+    filled <- NA
+    if (!is.na(steps))
+        filled <- c(steps)
+    else
+        filled <- (averages[averages$interval==interval, "steps"])
+    return(filled)
+}
+cleanData <- activity
+cleanData$steps <- mapply(fill.value, cleanData$steps, cleanData$interval)
+```
 
 
+Make a histogram of the total number of steps taken each day and calculate the mean and median total number of steps.
 
+```{r q3c}
+total.steps <- tapply(cleanData$steps, cleanData$date, FUN=sum)
+qplot(total.steps, binwidth=1000, xlab="total number of steps taken each day", ylab="Frequency", 
+fill=I("blue"), col=I("black"))
+```
+
+mean of the total number of steps taken per day in the new dataset
+
+```{r q3d}
+mean(total.steps, na.rm=TRUE)
+```
+
+median of the total number of steps taken per day in the new dataset
+
+```{r q3e}
+median(total.steps, na.rm=TRUE)
+```
 ## Are there differences in activity patterns between weekdays and weekends?
+
+Ientify the the weekend and weekdays in the data
+```{r q5a}
+  wdaywend <- function(date) {
+    day <- weekdays(date)
+    if (day %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"))
+        return("weekday")
+    else if (day %in% c("Saturday", "Sunday"))
+        return("weekend")
+    else
+        stop("invalid date")
+}
+cleanData$date <- as.Date(cleanData$date)
+cleanData$day <- sapply(cleanData$date, FUN=wdaywend)
+```
+Plot the number of steps based on the weekday or weekend
+
+```{r q5b}
+averages <- aggregate(steps ~ interval + day, data=cleanData, mean)
+ggplot(averages, aes(interval, steps)) + geom_line(color="blue")  + facet_grid(day ~ .) +
+    xlab("5-minute interval") + ylab("Number of steps")
+```
+
+Note that there seems to be a variation in the activity patterns between weekdays and weekends.
